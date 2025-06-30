@@ -36,6 +36,7 @@ class GraphState(TypedDict):
 class QuestionGenerationState(TypedDict):
     """
     Represents the state of the question generation graph.
+    Updated to include total_marks for mark assignment tracking.
     """
     pdf_file: bytes
     topic: str
@@ -52,3 +53,4 @@ class QuestionGenerationState(TypedDict):
     document_images: Dict[str, bytes]
     questions: List[Dict[str, Any]]
     question_paper: Optional[Dict[str, Any]]
+    total_marks: Optional[int]  # Added for tracking total marks after assignment

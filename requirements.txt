@@ -17,3 +17,4 @@ pydantic-core==2.33.2
 packaging==24.2
 urllib3==2.5.0
 tenacity==9.1.2
+openai==1.35.0

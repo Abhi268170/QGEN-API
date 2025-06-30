@@ -16,15 +16,16 @@ try:
     from .embedding import embed_images_node
     from .qdrant import add_to_qdrant_node, retrieve_relevant_images_node
     from .generation import generation_node
+    from .mark_assignment import assign_marks_node
 except ImportError:
     QDRANT_MEMORY_LIMIT = ":memory:"
     class QuestionGenerationState(dict): pass
     class GraphState(dict): pass
     def pdf_to_images_node(state): return state
-    def embed_images_node(state): return state
+    async def embed_images_node(state): return state
     def add_to_qdrant_node(state, client): return state
-    def retrieve_relevant_images_node(state, client): return state
-    def generation_node(state): return state
+    async def retrieve_relevant_images_node(state, client): return state
+    async def generation_node(state): return state
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -32,23 +33,28 @@ logger = logging.getLogger(__name__)
 def get_question_generation_graph():
     """
     Builds and returns the question generation graph.
+    Updated to handle async nodes properly and include mark assignment.
     """
     workflow = StateGraph(QuestionGenerationState)
 
     qdrant_client_instance = QdrantClient(QDRANT_MEMORY_LIMIT)
 
+    # Add nodes - some are sync, some are async
     workflow.add_node("pdf_to_images", pdf_to_images_node)
-    workflow.add_node("embed_images", embed_images_node)
+    workflow.add_node("embed_images", embed_images_node)  # async
     workflow.add_node("add_to_qdrant", functools.partial(add_to_qdrant_node, client=qdrant_client_instance))
-    workflow.add_node("retrieve_relevant_images", functools.partial(retrieve_relevant_images_node, client=qdrant_client_instance))
-    workflow.add_node("generate_questions", generation_node)
+    workflow.add_node("retrieve_relevant_images", functools.partial(retrieve_relevant_images_node, client=qdrant_client_instance))  # async
+    workflow.add_node("generate_questions", generation_node)  # async
+    workflow.add_node("assign_marks", assign_marks_node)  # sync - new node for mark assignment
 
+    # Define the flow
     workflow.set_entry_point("pdf_to_images")
     workflow.add_edge("pdf_to_images", "embed_images")
     workflow.add_edge("embed_images", "add_to_qdrant")
     workflow.add_edge("add_to_qdrant", "retrieve_relevant_images")
     workflow.add_edge("retrieve_relevant_images", "generate_questions")
-    workflow.add_edge("generate_questions", END)
+    workflow.add_edge("generate_questions", "assign_marks")  # Add mark assignment after generation
+    workflow.add_edge("assign_marks", END)
 
     app = workflow.compile()
     return app
